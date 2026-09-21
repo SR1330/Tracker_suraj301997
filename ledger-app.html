@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ledger — Live Crypto Tracker &amp; Paper Trader</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#0E1721; --surface:#131D27; --card:#182530; --border:#24333F;
+    --text:#E7EDF2; --muted:#8296A6; --gold:#C9A227; --up:#34C77B; --down:#F1554C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#080D12;}
+  body{font-family:'Inter',sans-serif;color:var(--text);display:flex;justify-content:center;padding:24px 12px;}
+  #app{background:var(--bg);width:100%;max-width:920px;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+
+  .marquee-wrap{background:var(--surface);border-bottom:1px solid var(--border);overflow:hidden;white-space:nowrap;padding:9px 0;}
+  .marquee-track{display:inline-flex;animation:scroll 38s linear infinite;}
+  #app:hover .marquee-track{animation-play-state:paused;}
+  @keyframes scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  .ticker-item{font-family:'IBM Plex Mono',monospace;font-size:12.5px;padding:0 22px;display:inline-flex;align-items:center;gap:8px;border-right:1px solid var(--border);}
+
+  .header{padding:28px 26px 18px;}
+  .wordmark{font-family:'Fraunces',serif;font-size:30px;font-weight:500;letter-spacing:-0.01em;margin:0;display:flex;align-items:baseline;gap:10px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--up);display:inline-block;box-shadow:0 0 0 3px rgba(52,199,123,0.18);}
+  .sub{color:var(--muted);font-size:13.5px;margin:4px 0 0;}
+
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 26px 18px;}
+  .search{background:var(--card);border:1px solid var(--border);color:var(--text);padding:9px 13px;border-radius:7px;font-size:13.5px;font-family:'Inter',sans-serif;flex:1;min-width:180px;outline:none;}
+  .search::placeholder{color:var(--muted);}
+  .search:focus{border-color:var(--gold);}
+  .updated{color:var(--muted);font-size:12px;font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+
+  .table-wrap{overflow-x:auto;padding:0 10px 8px;}
+  table.ct-table{width:100%;border-collapse:collapse;min-width:760px;}
+  .ct-table th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:500;padding:8px 14px;cursor:pointer;user-select:none;white-space:nowrap;}
+  .ct-table th:hover{color:var(--text);}
+  .ct-table td{padding:11px 14px;border-top:1px solid var(--border);font-size:13.5px;vertical-align:middle;}
+  .ct-table tr.row{cursor:pointer;transition:background 0.15s ease;}
+  .ct-table tr.row:hover{background:var(--card);}
+  .ct-table tr.watched{box-shadow:inset 3px 0 0 var(--gold);}
+  .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+  .coin-cell{display:flex;align-items:center;gap:10px;}
+  .coin-icon{width:26px;height:26px;border-radius:50%;object-fit:cover;background:var(--border);}
+  .coin-name{font-weight:500;}
+  .coin-symbol{color:var(--muted);font-size:11.5px;text-transform:uppercase;}
+  .pct-badge{font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 7px;border-radius:5px;white-space:nowrap;}
+  .flash-up{animation:flashUp 0.9s ease;}
+  .flash-down{animation:flashDown 0.9s ease;}
+  @keyframes flashUp{0%{background:rgba(52,199,123,0.22);}100%{background:transparent;}}
+  @keyframes flashDown{0%{background:rgba(241,85,76,0.22);}100%{background:transparent;}}
+  .banner{margin:0 26px 16px;padding:10px 14px;background:rgba(201,162,39,0.1);border:1px solid rgba(201,162,39,0.35);color:var(--gold);border-radius:7px;font-size:12.5px;}
+  .notify-btn{margin-top:12px;background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:7px 12px;border-radius:7px;cursor:pointer;}
+  .notify-btn:hover{color:var(--text);border-color:var(--gold);}
+  .notify-btn.enabled{color:var(--up);border-color:var(--up);}
+  .signals-wrap{margin:0 26px 16px;display:flex;flex-direction:column;gap:8px;}
+  .signal-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--gold);border-radius:8px;padding:12px 14px;animation:signalPulse 1.6s ease 1;}
+  .signal-card.sell{border-left-color:var(--up);}
+  @keyframes signalPulse{0%{box-shadow:0 0 0 0 rgba(201,162,39,0.45);}70%{box-shadow:0 0 0 8px rgba(201,162,39,0);}100%{box-shadow:none;}}
+  .signal-text{font-size:13px;}
+  .signal-text b{font-family:'IBM Plex Mono',monospace;}
+  .signal-time{color:var(--muted);font-size:11px;margin-top:2px;}
+  .signal-ack-btn{background:var(--card);border:1px solid var(--border);color:var(--text);font-size:12px;padding:7px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;}
+  .signal-ack-btn:hover{border-color:var(--gold);}
+  .star{background:none;border:none;cursor:pointer;font-size:15px;color:var(--border);padding:0;line-height:1;}
+  .star.active{color:var(--gold);}
+
+  .overlay{position:fixed;inset:0;background:rgba(6,10,14,0.6);display:none;align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .overlay.open{display:flex;}
+  .detail-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:460px;padding:22px;}
+  .detail-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+  .close-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;}
+  .close-btn:hover{color:var(--text);}
+  .detail-price{font-family:'Fraunces',serif;font-size:32px;font-weight:500;margin:6px 0 2px;}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+  .stat-label{color:var(--muted);font-size:11px;margin-bottom:4px;}
+  .stat-value{font-family:'IBM Plex Mono',monospace;font-size:14px;}
+  .empty{padding:40px 26px;text-align:center;color:var(--muted);font-size:13.5px;}
+
+  .section{margin:8px 26px 24px;padding-top:20px;border-top:1px solid var(--border);}
+  .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .section-title{font-family:'Fraunces',serif;font-size:19px;font-weight:500;margin:0;}
+  .section-note{color:var(--muted);font-size:12px;margin:3px 0 0;max-width:48ch;}
+  .toggle-wrap{display:flex;align-items:center;gap:9px;}
+  .toggle{position:relative;width:42px;height:24px;border-radius:12px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex-shrink:0;}
+  .toggle.on{background:rgba(52,199,123,0.25);border-color:var(--up);}
+  .toggle-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform .15s ease, background .15s ease;}
+  .toggle.on .toggle-knob{transform:translateX(18px);background:var(--up);}
+  .toggle-label{font-size:13px;font-weight:500;}
+  .field-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  .field{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 11px;}
+  .field label{display:block;color:var(--muted);font-size:10.5px;margin-bottom:5px;}
+  .field-row{display:flex;align-items:center;gap:4px;}
+  .field input{background:transparent;border:none;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:15px;width:100%;outline:none;}
+  .field span{color:var(--muted);font-size:12px;}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;}
+  .summary-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:11px 13px;}
+  .summary-label{color:var(--muted);font-size:10.5px;margin-bottom:5px;}
+  .summary-value{font-family:'IBM Plex Mono',monospace;font-size:16px;}
+  .reset-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:7px 12px;border-radius:7px;cursor:pointer;}
+  .reset-btn:hover{color:var(--text);border-color:var(--down);}
+  .pos-table,.log-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .pos-table th,.log-table th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;padding:6px 10px;border-bottom:1px solid var(--border);}
+  .pos-table td,.log-table td{padding:8px 10px;border-bottom:1px solid var(--border);}
+  .log-wrap{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+  .side-buy{color:var(--gold);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
+  .side-sell{color:var(--text);font-weight:600;font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
+  .empty-inline{color:var(--muted);font-size:12.5px;padding:14px;text-align:center;border:1px solid var(--border);border-radius:8px;}
+  .footer-note{padding:16px 26px 26px;color:var(--muted);font-size:11.5px;}
+  .bt-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px;}
+  .bt-controls select{background:transparent;border:none;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:14px;width:100%;outline:none;}
+  .bt-controls .field{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 11px;}
+  .bt-controls .field label{display:block;color:var(--muted);font-size:10.5px;margin-bottom:5px;}
+  .bt-status{color:var(--muted);font-size:12.5px;padding:6px 0;}
+  .bt-error{margin-bottom:16px;padding:10px 14px;background:rgba(241,85,76,0.1);border:1px solid rgba(241,85,76,0.35);color:var(--down);border-radius:7px;font-size:12.5px;}
+  @media (max-width:560px){
+    .header{padding:22px 16px 14px;} .controls{padding:0 16px 14px;} .table-wrap{padding:0 4px 8px;}
+    .section{margin:8px 16px 20px;} .field-grid{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="marquee-wrap"><div class="marquee-track" id="ticker"></div></div>
+
+  <div class="header">
+    <h1 class="wordmark"><span class="dot"></span>Ledger</h1>
+    <p class="sub">Live prices, refreshed automatically — plus a paper-trading bot that buys dips and exits at your targets.</p>
+    <button class="notify-btn" id="notifyBtn">🔔 Enable alerts for buy/sell signals</button>
+  </div>
+
+  <div id="banner"></div>
+  <div id="signalsPanel"></div>
+
+  <div class="controls">
+    <input class="search" id="searchInput" placeholder="Search by name or symbol…" />
+    <span class="updated" id="updatedLabel">loading…</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="ct-table">
+      <thead>
+        <tr>
+          <th style="width:30px;"></th>
+          <th data-sort="market_cap_rank">#</th>
+          <th data-sort="name">Coin</th>
+          <th data-sort="current_price">Price</th>
+          <th data-sort="price_change_percentage_24h">24h</th>
+          <th data-sort="market_cap">Market cap</th>
+          <th data-sort="total_volume">Volume</th>
+          <th>7d</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Auto-trader (paper simulation)</h2>
+        <p class="section-note" id="watchNote">Watches your starred coins for upward momentum and buys when the chart shows a realistic shot at your predicted rise — skips coins heading down. Exits at your profit target or stop-loss. No real money or exchange account is touched — this is a simulation, not financial advice.</p>
+      </div>
+      <div class="toggle-wrap">
+        <span class="toggle-label" id="botLabel">Bot off</span>
+        <div class="toggle" id="botToggle"><div class="toggle-knob"></div></div>
+      </div>
+    </div>
+
+    <div class="field-grid">
+      <div class="field"><label>Predict rise of at least</label><div class="field-row"><input type="number" min="0.1" step="0.1" id="riseInput"><span>% up</span></div></div>
+      <div class="field"><label>Take profit at</label><div class="field-row"><input type="number" min="0.1" step="0.1" id="tpInput"><span>% gain</span></div></div>
+      <div class="field"><label>Stop-loss at</label><div class="field-row"><input type="number" min="0.1" step="0.1" id="slInput"><span>% down</span></div></div>
+      <div class="field"><label>Position size</label><div class="field-row"><input type="number" min="1" max="100" step="1" id="sizeInput"><span>% of cash</span></div></div>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+      <button class="reset-btn" id="resetBtn">Reset simulator to $10,000</button>
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <div class="summary-label" style="margin-bottom:8px;">OPEN POSITIONS</div>
+      <div id="positionsWrap"></div>
+    </div>
+
+    <div>
+      <div class="summary-label" style="margin-bottom:8px;">TRADE LOG</div>
+      <div id="tradesWrap"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Backtest on real history</h2>
+        <p class="section-note">Runs this exact strategy — same rise threshold, profit target, and stop-loss you've set above — against real past prices for one coin, so you can see an honest track record instead of a guess.</p>
+      </div>
+    </div>
+    <div class="bt-controls">
+      <div class="field" style="flex:1;min-width:160px;">
+        <label>Coin</label>
+        <select id="btCoinSelect"></select>
+      </div>
+      <div class="field" style="flex:1;min-width:140px;">
+        <label>Lookback period</label>
+        <select id="btDaysSelect">
+          <option value="30">30 days (hourly)</option>
+          <option value="90" selected>90 days (hourly)</option>
+          <option value="180">180 days (daily)</option>
+          <option value="365">365 days (daily)</option>
+        </select>
+      </div>
+      <button class="add-btn" id="btRunBtn" style="align-self:flex-end;">Run backtest</button>
+    </div>
+    <div id="btResults"></div>
+  </div>
+
+  <div class="footer-note">Prices from CoinGecko's public API. This file runs entirely in your browser — nothing is sent to any server except the price requests. Your settings and paper portfolio are saved locally in this browser only.</div>
+</div>
+
+<div class="overlay" id="modalOverlay">
+  <div class="detail-card" id="modalCard"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const STARTING_BALANCE = 10000;
+  const STORAGE_KEY = "ledger_app_state_v1";
+
+  const fmtPrice = n => n==null ? "—" : n>=1000 ? n.toLocaleString(undefined,{maximumFractionDigits:0}) : n>=1 ? n.toLocaleString(undefined,{maximumFractionDigits:2}) : n.toLocaleString(undefined,{maximumFractionDigits:6});
+  const fmtCompact = n => {
+    if(n==null) return "—";
+    const a=Math.abs(n);
+    if(a>=1e12) return (n/1e12).toFixed(2)+"T";
+    if(a>=1e9) return (n/1e9).toFixed(2)+"B";
+    if(a>=1e6) return (n/1e6).toFixed(2)+"M";
+    if(a>=1e3) return (n/1e3).toFixed(1)+"K";
+    return n.toFixed(0);
+  };
+  const fmtSigned = (n,d=2) => n==null||isNaN(n) ? "—" : (n>0?"+":"")+n.toFixed(d);
+  const esc = s => (s==null?"":String(s)).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  function sparklineSVG(prices, positive){
+    if(!prices || prices.length<2) return `<svg width="110" height="36"></svg>`;
+    const w=110,h=36;
+    const min=Math.min(...prices), max=Math.max(...prices);
+    const range=(max-min)||1;
+    const step=w/(prices.length-1);
+    const pts=prices.map((p,i)=>`${(i*step).toFixed(1)},${(h-((p-min)/range)*h).toFixed(1)}`).join(" ");
+    const color= positive ? "#34C77B" : "#F1554C";
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <polygon points="0,${h} ${pts} ${w},${h}" fill="${color}" opacity="0.15"></polygon>
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6"></polyline>
+    </svg>`;
+  }
+  function detailChartSVG(prices, positive){
+    if(!prices || prices.length<2) return `<svg width="100%" height="160"></svg>`;
+    const w=416,h=160;
+    const min=Math.min(...prices), max=Math.max(...prices);
+    const range=(max-min)||1;
+    const step=w/(prices.length-1);
+    const pts=prices.map((p,i)=>`${(i*step).toFixed(1)},${(h-((p-min)/range)*h*0.85 - h*0.075).toFixed(1)}`).join(" ");
+    const color= positive ? "#34C77B" : "#F1554C";
+    return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polygon points="0,${h} ${pts} ${w},${h}" fill="${color}" opacity="0.18"></polygon>
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"></polyline>
+    </svg>`;
+  }
+  function pctBadge(value){
+    if(value==null) return `<span style="color:var(--muted)">—</span>`;
+    const up = value>=0;
+    return `<span class="pct-badge" style="color:${up?'var(--up)':'var(--down)'};background:${up?'rgba(52,199,123,0.12)':'rgba(241,85,76,0.12)'}">${up?"▲":"▼"} ${Math.abs(value).toFixed(2)}%</span>`;
+  }
+
+  // ---------- state ----------
+  let state = {
+    coins: [],
+    query: "",
+    sortKey: "market_cap_rank",
+    sortDir: "asc",
+    watchlist: new Set(),
+    watchlistSeeded: false,
+    botEnabled: false,
+    predictUpPct: 2,
+    takeProfitPct: 3,
+    stopLossPct: 3,
+    positionSizePct: 10,
+    cash: STARTING_BALANCE,
+    positions: {},
+    trades: [],
+    pendingSignals: [],
+    selectedId: null,
+    lastUpdated: null,
+    usingDemo: false,
+    error: null
+  };
+  let priceHistory = {};
+  let prevPrices = {};
+
+  function loadPersisted(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      const saved = JSON.parse(raw);
+      if(saved.watchlist) { state.watchlist = new Set(saved.watchlist); state.watchlistSeeded = true; }
+      if(typeof saved.botEnabled === "boolean") state.botEnabled = saved.botEnabled;
+      if(saved.predictUpPct!=null) state.predictUpPct = saved.predictUpPct;
+      if(saved.takeProfitPct!=null) state.takeProfitPct = saved.takeProfitPct;
+      if(saved.stopLossPct!=null) state.stopLossPct = saved.stopLossPct;
+      if(saved.positionSizePct!=null) state.positionSizePct = saved.positionSizePct;
+      if(saved.cash!=null) state.cash = saved.cash;
+      if(saved.positions) state.positions = saved.positions;
+      if(saved.trades) state.trades = saved.trades;
+      if(saved.pendingSignals) state.pendingSignals = saved.pendingSignals;
+    }catch(e){ /* ignore corrupt storage */ }
+  }
+  function persist(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        watchlist: [...state.watchlist],
+        botEnabled: state.botEnabled,
+        predictUpPct: state.predictUpPct,
+        takeProfitPct: state.takeProfitPct,
+        stopLossPct: state.stopLossPct,
+        positionSizePct: state.positionSizePct,
+        cash: state.cash,
+        positions: state.positions,
+        trades: state.trades,
+        pendingSignals: state.pendingSignals
+      }));
+    }catch(e){ /* storage full or unavailable */ }
+  }
+
+  // ---------- DOM refs ----------
+  const el = id => document.getElementById(id);
+  const tickerEl = el("ticker");
+  const bannerEl = el("banner");
+  const signalsPanelEl = el("signalsPanel");
+  const notifyBtn = el("notifyBtn");
+  const updatedEl = el("updatedLabel");
+  const tbodyEl = el("tbody");
+  const searchInput = el("searchInput");
+  const watchNoteEl = el("watchNote");
+  const botToggleEl = el("botToggle");
+  const botLabelEl = el("botLabel");
+  const riseInput = el("riseInput");
+  const tpInput = el("tpInput");
+  const slInput = el("slInput");
+  const sizeInput = el("sizeInput");
+  const summaryGridEl = el("summaryGrid");
+  const positionsWrapEl = el("positionsWrap");
+  const tradesWrapEl = el("tradesWrap");
+  const resetBtn = el("resetBtn");
+  const btCoinSelect = el("btCoinSelect");
+  const btDaysSelect = el("btDaysSelect");
+  const btRunBtn = el("btRunBtn");
+  const btResultsEl = el("btResults");
+  let btCoinSelectPopulated = false;
+  const modalOverlay = el("modalOverlay");
+  const modalCard = el("modalCard");
+
+  // ---------- rendering ----------
+  function renderSignals(){
+    if(!state.pendingSignals.length){ signalsPanelEl.innerHTML = ""; return; }
+    signalsPanelEl.innerHTML = `<div class="signals-wrap">${state.pendingSignals.map(s=>`
+      <div class="signal-card ${s.side==='SELL'?'sell':''}">
+        <div>
+          <div class="signal-text">
+            <b style="color:${s.side==='BUY'?'var(--gold)':'var(--up)'}">${s.side}</b>
+            — place this on your real exchange now:
+            <b>${s.qty.toFixed(6)} ${(s.symbol||"").toUpperCase()}</b> at ~<b>$${fmtPrice(s.price)}</b>
+            <span style="color:var(--muted)">(${esc(s.reason)})</span>
+          </div>
+          <div class="signal-time">${new Date(s.time).toLocaleTimeString()}</div>
+        </div>
+        <button class="signal-ack-btn" data-ack="${esc(s.id)}">I placed this order</button>
+      </div>`).join("")}</div>`;
+  }
+
+  function renderTicker(){
+    const top = state.coins.slice(0,16);
+    const list = [...top, ...top];
+    tickerEl.innerHTML = list.map(c => `
+      <span class="ticker-item">
+        <strong style="font-family:'Inter',sans-serif;font-weight:600;">${esc((c.symbol||"").toUpperCase())}</strong>
+        <span>$${fmtPrice(c.current_price)}</span>
+        <span style="color:${(c.price_change_percentage_24h??0)>=0?'var(--up)':'var(--down)'}">
+          ${(c.price_change_percentage_24h??0)>=0?"▲":"▼"}${Math.abs(c.price_change_percentage_24h??0).toFixed(1)}%
+        </span>
+      </span>`).join("");
+  }
+
+  function getFiltered(){
+    const q = state.query.trim().toLowerCase();
+    let list = state.coins.filter(c => !q || c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q));
+    list = [...list].sort((a,b)=>{
+      const av = a[state.sortKey] ?? -Infinity, bv = b[state.sortKey] ?? -Infinity;
+      if(av<bv) return state.sortDir==="asc" ? -1 : 1;
+      if(av>bv) return state.sortDir==="asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }
+
+  function renderTable(flashMap){
+    flashMap = flashMap || {};
+    const list = getFiltered();
+    if(list.length===0){
+      tbodyEl.innerHTML = `<tr><td colspan="8"><div class="empty">No coins match "${esc(state.query)}". Try a different name or symbol.</div></td></tr>`;
+      return;
+    }
+    tbodyEl.innerHTML = list.map(c=>{
+      const positive = (c.price_change_percentage_24h??0)>=0;
+      const watched = state.watchlist.has(c.id);
+      const flashClass = flashMap[c.id]==="up" ? "flash-up" : flashMap[c.id]==="down" ? "flash-down" : "";
+      return `<tr class="row ${flashClass} ${watched?'watched':''}" data-id="${esc(c.id)}">
+        <td><button class="star ${watched?'active':''}" data-star="${esc(c.id)}" title="Toggle bot watchlist">${watched?"★":"☆"}</button></td>
+        <td class="num" style="color:var(--muted)">${c.market_cap_rank??"—"}</td>
+        <td><div class="coin-cell">
+          ${c.image?`<img class="coin-icon" src="${esc(c.image)}" alt="">`:`<div class="coin-icon"></div>`}
+          <div><div class="coin-name">${esc(c.name)}</div><div class="coin-symbol">${esc(c.symbol)}</div></div>
+        </div></td>
+        <td class="num">$${fmtPrice(c.current_price)}</td>
+        <td>${pctBadge(c.price_change_percentage_24h)}</td>
+        <td class="num" style="color:var(--muted)">$${fmtCompact(c.market_cap)}</td>
+        <td class="num" style="color:var(--muted)">$${fmtCompact(c.total_volume)}</td>
+        <td>${sparklineSVG(c.sparkline_in_7d && c.sparkline_in_7d.price, positive)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function computeDerived(){
+    const priceById = {};
+    state.coins.forEach(c => priceById[c.id]=c.current_price);
+    const positionsList = Object.entries(state.positions).map(([id,p])=>{
+      const curPrice = priceById[id] ?? p.entryPrice;
+      const unrealizedPct = ((curPrice-p.entryPrice)/p.entryPrice)*100;
+      const unrealizedUsd = (curPrice-p.entryPrice)*p.qty;
+      return {id,...p,curPrice,unrealizedPct,unrealizedUsd};
+    });
+    const positionsValue = positionsList.reduce((s,p)=>s+p.curPrice*p.qty,0);
+    const equity = state.cash + positionsValue;
+    const realizedPnl = state.trades.filter(t=>t.side==="SELL").reduce((s,t)=>s+(t.pnl||0),0);
+    const totalReturnPct = ((equity-STARTING_BALANCE)/STARTING_BALANCE)*100;
+    return {positionsList, positionsValue, equity, realizedPnl, totalReturnPct};
+  }
+
+  function renderSummary(){
+    const d = computeDerived();
+    summaryGridEl.innerHTML = `
+      <div class="summary-card"><div class="summary-label">Cash</div><div class="summary-value">$${fmtCompact(state.cash)}</div></div>
+      <div class="summary-card"><div class="summary-label">In positions</div><div class="summary-value">$${fmtCompact(d.positionsValue)}</div></div>
+      <div class="summary-card"><div class="summary-label">Total equity</div><div class="summary-value">$${fmtCompact(d.equity)}</div></div>
+      <div class="summary-card"><div class="summary-label">Realized P/L</div><div class="summary-value" style="color:${d.realizedPnl>=0?'var(--up)':'var(--down)'}">${fmtSigned(d.realizedPnl)}</div></div>
+      <div class="summary-card"><div class="summary-label">Total return</div><div class="summary-value" style="color:${d.totalReturnPct>=0?'var(--up)':'var(--down)'}">${fmtSigned(d.totalReturnPct)}%</div></div>
+    `;
+    watchNoteEl.textContent = `Watches the ${state.watchlist.size} starred coin${state.watchlist.size===1?"":"s"} above for upward momentum — it only buys when its chart shows the price turning up with a realistic shot at your predicted rise, and skips coins that look like they're heading down. Exits automatically at your profit target or stop-loss. Every buy/sell also shows as an alert above with the exact quantity and price, so you can place the same order yourself on your real exchange. This is a simple heuristic, not a real forecast — it can be wrong. No real money or exchange account is touched by this app — this is a simulation, not financial advice.`;
+  }
+
+  function renderPositions(){
+    const d = computeDerived();
+    if(d.positionsList.length===0){
+      positionsWrapEl.innerHTML = `<div class="empty-inline">No open positions yet. Star a few coins above and turn the bot on to get started.</div>`;
+      return;
+    }
+    positionsWrapEl.innerHTML = `<div style="overflow-x:auto"><table class="pos-table">
+      <thead><tr><th>Coin</th><th>Entry</th><th>Current</th><th>Qty</th><th>Unrealized</th></tr></thead>
+      <tbody>${d.positionsList.map(p=>`
+        <tr>
+          <td>${esc(p.name)} <span class="coin-symbol">${esc(p.symbol)}</span></td>
+          <td class="num">$${fmtPrice(p.entryPrice)}</td>
+          <td class="num">$${fmtPrice(p.curPrice)}</td>
+          <td class="num">${p.qty.toFixed(5)}</td>
+          <td class="num" style="color:${p.unrealizedPct>=0?'var(--up)':'var(--down)'}">${fmtSigned(p.unrealizedUsd,2)} (${fmtSigned(p.unrealizedPct)}%)</td>
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+
+  function renderTrades(){
+    if(state.trades.length===0){
+      tradesWrapEl.innerHTML = `<div class="empty-inline">No trades yet.</div>`;
+      return;
+    }
+    tradesWrapEl.innerHTML = `<div class="log-wrap"><table class="log-table">
+      <thead><tr><th>Time</th><th>Side</th><th>Coin</th><th>Price</th><th>Qty</th><th>Reason</th><th>P/L</th></tr></thead>
+      <tbody>${state.trades.map(t=>`
+        <tr>
+          <td style="color:var(--muted)">${new Date(t.time).toLocaleTimeString()}</td>
+          <td><span class="${t.side==='BUY'?'side-buy':'side-sell'}">${t.side}</span></td>
+          <td>${esc((t.symbol||"").toUpperCase())}</td>
+          <td class="num">$${fmtPrice(t.price)}</td>
+          <td class="num">${t.qty.toFixed(5)}</td>
+          <td style="color:var(--muted)">${esc(t.reason)}</td>
+          <td class="num" style="color:${t.pnl==null?'var(--muted)':t.pnl>=0?'var(--up)':'var(--down)'}">${t.pnl==null?"—":`${fmtSigned(t.pnl)} (${fmtSigned(t.pct)}%)`}</td>
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+
+  function renderModal(){
+    if(!state.selectedId){ modalOverlay.classList.remove("open"); modalCard.innerHTML=""; return; }
+    const c = state.coins.find(x=>x.id===state.selectedId);
+    if(!c){ modalOverlay.classList.remove("open"); return; }
+    const positive = (c.price_change_percentage_24h||0)>=0;
+    modalCard.innerHTML = `
+      <div class="detail-top">
+        <div class="coin-cell">
+          ${c.image?`<img class="coin-icon" src="${esc(c.image)}" alt="">`:`<div class="coin-icon"></div>`}
+          <div><div class="coin-name">${esc(c.name)}</div><div class="coin-symbol">${esc(c.symbol)}</div></div>
+        </div>
+        <button class="close-btn" id="modalClose">✕</button>
+      </div>
+      <div class="detail-price">$${fmtPrice(c.current_price)}</div>
+      ${pctBadge(c.price_change_percentage_24h)}
+      <div style="margin-top:14px;">${detailChartSVG(c.sparkline_in_7d && c.sparkline_in_7d.price, positive)}</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-label">Market cap</div><div class="stat-value">$${fmtCompact(c.market_cap)}</div></div>
+        <div class="stat"><div class="stat-label">24h volume</div><div class="stat-value">$${fmtCompact(c.total_volume)}</div></div>
+        <div class="stat"><div class="stat-label">Rank</div><div class="stat-value">#${c.market_cap_rank??"—"}</div></div>
+        <div class="stat"><div class="stat-label">Symbol</div><div class="stat-value">${esc((c.symbol||"").toUpperCase())}</div></div>
+      </div>`;
+    modalOverlay.classList.add("open");
+    el("modalClose").addEventListener("click", ()=>{ state.selectedId=null; renderModal(); });
+  }
+
+  function renderBotUI(){
+    botLabelEl.textContent = state.botEnabled ? "Bot running" : "Bot off";
+    botToggleEl.classList.toggle("on", state.botEnabled);
+    riseInput.value = state.predictUpPct;
+    tpInput.value = state.takeProfitPct;
+    slInput.value = state.stopLossPct;
+    sizeInput.value = state.positionSizePct;
+  }
+
+  // ---------- bot logic ----------
+  function runBotTick(){
+    const nowTs = Date.now();
+    state.coins.forEach(c=>{
+      if(!state.watchlist.has(c.id)) return;
+      const price = c.current_price;
+      if(price==null) return;
+      let h = priceHistory[c.id];
+      if(!h){
+        const spark = ((c.sparkline_in_7d && c.sparkline_in_7d.price) || []).slice(-8);
+        h = spark.map((p,i)=>({t: nowTs-(spark.length-i)*15*60*1000, price:p}));
+        priceHistory[c.id] = h;
+      }
+      h.push({t: nowTs, price});
+      if(h.length>40) h.splice(0, h.length-40);
+    });
+
+    if(!state.botEnabled) return;
+
+    state.coins.forEach(c=>{
+      if(!state.watchlist.has(c.id)) return;
+      const price = c.current_price;
+      if(price==null) return;
+      const h = priceHistory[c.id] || [];
+
+      const pos = state.positions[c.id];
+      if(pos){
+        const unrealizedPct = ((price-pos.entryPrice)/pos.entryPrice)*100;
+        if(unrealizedPct >= state.takeProfitPct || unrealizedPct <= -state.stopLossPct){
+          const proceeds = pos.qty*price;
+          const pnl = proceeds - pos.qty*pos.entryPrice;
+          const reason = unrealizedPct >= state.takeProfitPct ? "take-profit" : "stop-loss";
+          state.cash += proceeds;
+          state.trades = [{id:`${c.id}-${nowTs}`, time:nowTs, coinId:c.id, symbol:c.symbol, name:c.name, side:"SELL", price, qty:pos.qty, pnl, pct:unrealizedPct, reason}, ...state.trades].slice(0,60);
+          delete state.positions[c.id];
+          emitSignal({side:"SELL", symbol:c.symbol, name:c.name, qty:pos.qty, price, reason});
+        }
+        return;
+      }
+
+      const signal = readChartSignal(h, state.predictUpPct);
+      if(signal.buy){
+        const spend = state.cash * (state.positionSizePct/100);
+        if(spend>=1 && spend<=state.cash){
+          const qty = spend/price;
+          state.cash -= spend;
+          state.positions[c.id] = {entryPrice:price, qty, entryTime:nowTs, symbol:c.symbol, name:c.name};
+          state.trades = [{id:`${c.id}-${nowTs}`, time:nowTs, coinId:c.id, symbol:c.symbol, name:c.name, side:"BUY", price, qty, pnl:null, pct:null, reason:signal.reason}, ...state.trades].slice(0,60);
+          emitSignal({side:"BUY", symbol:c.symbol, name:c.name, qty, price, reason:signal.reason});
+        }
+      }
+    });
+  }
+
+  // Reads the tracked price history like a tiny chart-reading model:
+  // 1) is short-term momentum turning upward (fast average crossing above slow average)?
+  // 2) has this coin recently swung at least as much as the target rise, historically —
+  //    i.e. does its own chart suggest a move of that size is plausible right now?
+  // Both have to be true to call it a "predicted" buy. This is a simple heuristic,
+  // not a real forecast — it can be wrong, and past swings don't guarantee a repeat.
+  function readChartSignal(history, targetPct){
+    const prices = history.map(p=>p.price);
+    const n = prices.length;
+    if(n < 6) return {buy:false};
+
+    const avg = arr => arr.reduce((s,v)=>s+v,0) / arr.length;
+    const fastN = Math.min(5, n);
+    const slowN = Math.min(20, n);
+    const fastMA = avg(prices.slice(-fastN));
+    const slowMA = avg(prices.slice(-slowN));
+
+    let bullishNow = fastMA > slowMA;
+    let justTurnedBullish = bullishNow;
+    if(n > slowN + 1){
+      const prevFastMA = avg(prices.slice(-fastN-1, -1));
+      const prevSlowMA = avg(prices.slice(-slowN-1, -1));
+      justTurnedBullish = bullishNow && !(prevFastMA > prevSlowMA);
+    }
+
+    const rollingHigh = Math.max(...prices);
+    const rollingLow = Math.min(...prices);
+    const rangePct = rollingLow > 0 ? ((rollingHigh - rollingLow) / rollingLow) * 100 : 0;
+    const lastPrice = prices[n-1];
+    const notAtLocalTop = lastPrice < rollingHigh * 1.001; // avoid chasing a price already spiking
+
+    const buy = justTurnedBullish && rangePct >= targetPct && notAtLocalTop;
+    return {
+      buy,
+      reason: buy ? `predicted rise ~${rangePct.toFixed(1)}%, momentum turning up` : ""
+    };
+  }
+
+  // Creates a pending "do this on your real exchange" alert, plays a short beep,
+  // and fires a browser/phone notification if the user has allowed it.
+  function emitSignal({side, symbol, name, qty, price, reason}){
+    const sig = {
+      id: `sig-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+      time: Date.now(), side, symbol, name, qty, price, reason
+    };
+    state.pendingSignals = [sig, ...state.pendingSignals].slice(0, 30);
+    renderSignals();
+    persist();
+    playBeep();
+    if(typeof Notification !== "undefined" && Notification.permission === "granted"){
+      try{
+        new Notification(`${side} signal: ${symbol.toUpperCase()}`, {
+          body: `${side} ${qty.toFixed(6)} ${symbol.toUpperCase()} at ~$${fmtPrice(price)} (${reason}). Place this manually on your exchange.`
+        });
+      }catch(e){ /* notifications not available */ }
+    }
+  }
+
+  function playBeep(){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.value = 0.15;
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.18);
+      setTimeout(()=>{ try{ ctx.close(); }catch(e){} }, 400);
+    }catch(e){ /* audio not available */ }
+  }
+
+  // ---------- data fetch ----------
+  const FALLBACK = [
+    {id:"bitcoin",symbol:"btc",name:"Bitcoin",current_price:64230,market_cap:1265000000000,market_cap_rank:1,total_volume:28900000000,price_change_percentage_24h:1.8,sparkline_in_7d:{price:seedLine(64230,0.02)}},
+    {id:"ethereum",symbol:"eth",name:"Ethereum",current_price:3410,market_cap:410000000000,market_cap_rank:2,total_volume:15200000000,price_change_percentage_24h:-0.9,sparkline_in_7d:{price:seedLine(3410,0.03)}},
+    {id:"solana",symbol:"sol",name:"Solana",current_price:148,market_cap:68000000000,market_cap_rank:5,total_volume:3100000000,price_change_percentage_24h:4.1,sparkline_in_7d:{price:seedLine(148,0.05)}}
+  ];
+  function seedLine(base,vol){
+    let v=base; const arr=[];
+    for(let i=0;i<48;i++){ v = v*(1+(Math.sin(i*1.3)*vol)/3+(Math.random()-0.5)*vol); arr.push(v); }
+    return arr;
+  }
+
+  async function fetchData(){
+    try{
+      const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=40&page=1&sparkline=true&price_change_percentage=24h");
+      if(!res.ok) throw new Error("Request failed: "+res.status);
+      const data = await res.json();
+      if(!Array.isArray(data) || data.length===0) throw new Error("Empty response");
+
+      const flashMap = {};
+      data.forEach(c=>{
+        const prev = prevPrices[c.id];
+        if(prev!=null && c.current_price!=null && prev!==c.current_price) flashMap[c.id] = c.current_price>prev ? "up":"down";
+        prevPrices[c.id] = c.current_price;
+      });
+
+      if(!state.watchlistSeeded){
+        state.watchlistSeeded = true;
+        state.watchlist = new Set(data.slice(0,8).map(c=>c.id));
+      }
+
+      state.coins = data;
+      state.usingDemo = false;
+      state.error = null;
+      state.lastUpdated = new Date();
+      bannerEl.innerHTML = "";
+      updatedEl.textContent = "updated " + state.lastUpdated.toLocaleTimeString();
+      if(!btCoinSelectPopulated && data.length){
+        btCoinSelectPopulated = true;
+        btCoinSelect.innerHTML = data.slice(0,40).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} (${esc((c.symbol||"").toUpperCase())})</option>`).join("");
+      }
+
+      runBotTick();
+      renderTicker();
+      renderTable(flashMap);
+      renderSummary();
+      renderPositions();
+      renderTrades();
+      persist();
+    }catch(e){
+      state.error = e.message || "Couldn't reach the market data source.";
+      state.usingDemo = true;
+      if(state.coins.length===0) state.coins = FALLBACK;
+      bannerEl.innerHTML = `<div class="banner">Live feed unavailable right now (${esc(state.error)}). Showing sample data so the layout stays usable — it'll switch back automatically once the connection recovers.</div>`;
+      updatedEl.textContent = "sample data";
+      renderTicker();
+      renderTable({});
+      renderSummary();
+      renderPositions();
+      renderTrades();
+    }
+  }
+
+  // ---------- events ----------
+  searchInput.addEventListener("input", e=>{ state.query = e.target.value; renderTable({}); });
+
+  document.querySelectorAll("th[data-sort]").forEach(th=>{
+    th.addEventListener("click", ()=>{
+      const key = th.getAttribute("data-sort");
+      if(state.sortKey===key) state.sortDir = state.sortDir==="asc" ? "desc" : "asc";
+      else { state.sortKey = key; state.sortDir = key==="name" ? "asc" : "desc"; }
+      renderTable({});
+    });
+  });
+
+  tbodyEl.addEventListener("click", e=>{
+    const starBtn = e.target.closest("[data-star]");
+    if(starBtn){
+      e.stopPropagation();
+      const id = starBtn.getAttribute("data-star");
+      if(state.watchlist.has(id)) state.watchlist.delete(id); else state.watchlist.add(id);
+      renderTable({});
+      renderSummary();
+      persist();
+      return;
+    }
+    const row = e.target.closest("tr[data-id]");
+    if(row){ state.selectedId = row.getAttribute("data-id"); renderModal(); }
+  });
+
+  modalOverlay.addEventListener("click", e=>{ if(e.target===modalOverlay){ state.selectedId=null; renderModal(); } });
+
+  botToggleEl.addEventListener("click", ()=>{
+    state.botEnabled = !state.botEnabled;
+    renderBotUI();
+    persist();
+  });
+
+  function bindNumberInput(inputEl, key, min, max){
+    inputEl.addEventListener("input", ()=>{
+      let v = Number(inputEl.value);
+      if(isNaN(v)) v = min;
+      if(min!=null) v = Math.max(min, v);
+      if(max!=null) v = Math.min(max, v);
+      state[key] = v;
+      persist();
+    });
+  }
+  bindNumberInput(riseInput, "predictUpPct", 0.1, null);
+  bindNumberInput(tpInput, "takeProfitPct", 0.1, null);
+  bindNumberInput(slInput, "stopLossPct", 0.1, null);
+  bindNumberInput(sizeInput, "positionSizePct", 1, 100);
+
+  resetBtn.addEventListener("click", ()=>{
+    state.cash = STARTING_BALANCE;
+    state.positions = {};
+    state.trades = [];
+    renderSummary();
+    renderPositions();
+    renderTrades();
+    persist();
+  });
+
+  signalsPanelEl.addEventListener("click", e=>{
+    const btn = e.target.closest("[data-ack]");
+    if(!btn) return;
+    const id = btn.getAttribute("data-ack");
+    state.pendingSignals = state.pendingSignals.filter(s=>s.id!==id);
+    renderSignals();
+    persist();
+  });
+
+  // ---------- backtest ----------
+  // Replays the SAME readChartSignal() function and the SAME take-profit/stop-loss
+  // rules used by the live bot, but over real historical prices instead of live ticks.
+  // This is the honest version of "testing it": actual past data, actual win rate,
+  // no promise about the future.
+  async function runBacktest(){
+    const coinId = btCoinSelect.value;
+    const days = btDaysSelect.value;
+    if(!coinId){ btResultsEl.innerHTML = `<div class="bt-error">Pick a coin first.</div>`; return; }
+
+    btRunBtn.disabled = true;
+    btRunBtn.textContent = "Running…";
+    btResultsEl.innerHTML = `<div class="bt-status">Fetching real historical prices…</div>`;
+
+    try{
+      const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coinId)}/market_chart?vs_currency=usd&days=${days}`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const json = await res.json();
+      const series = (json.prices || []).filter(p=>p && p[1]!=null);
+      if(series.length < 30) throw new Error("Not enough historical data returned");
+
+      const START_CASH = 10000;
+      let cash = START_CASH;
+      let position = null;
+      const trades = [];
+      const equityCurve = [];
+      let window_ = [];
+      let peakEquity = START_CASH;
+      let maxDrawdownPct = 0;
+
+      for(const [ts, price] of series){
+        window_.push({t: ts, price});
+        if(window_.length > 40) window_.shift();
+
+        if(position){
+          const unrealizedPct = ((price - position.entryPrice) / position.entryPrice) * 100;
+          if(unrealizedPct >= state.takeProfitPct || unrealizedPct <= -state.stopLossPct){
+            const proceeds = position.qty * price;
+            const pnl = proceeds - position.qty * position.entryPrice;
+            cash += proceeds;
+            trades.push({
+              entryTime: position.entryTime, exitTime: ts,
+              entryPrice: position.entryPrice, exitPrice: price,
+              pct: unrealizedPct, pnl,
+              reason: unrealizedPct >= state.takeProfitPct ? "take-profit" : "stop-loss"
+            });
+            position = null;
+          }
+        } else {
+          const signal = readChartSignal(window_, state.predictUpPct);
+          if(signal.buy){
+            const spend = cash * (state.positionSizePct / 100);
+            if(spend >= 1 && spend <= cash){
+              const qty = spend / price;
+              cash -= spend;
+              position = { entryPrice: price, qty, entryTime: ts };
+            }
+          }
+        }
+
+        const equity = cash + (position ? position.qty * price : 0);
+        equityCurve.push(equity);
+        peakEquity = Math.max(peakEquity, equity);
+        const ddPct = peakEquity > 0 ? ((peakEquity - equity) / peakEquity) * 100 : 0;
+        maxDrawdownPct = Math.max(maxDrawdownPct, ddPct);
+      }
+
+      const lastPrice = series[series.length-1][1];
+      const finalEquity = cash + (position ? position.qty * lastPrice : 0);
+      const closedTrades = trades;
+      const wins = closedTrades.filter(t=>t.pnl > 0);
+      const losses = closedTrades.filter(t=>t.pnl <= 0);
+      const winRate = closedTrades.length ? (wins.length/closedTrades.length)*100 : 0;
+      const avgWinPct = wins.length ? wins.reduce((s,t)=>s+t.pct,0)/wins.length : 0;
+      const avgLossPct = losses.length ? losses.reduce((s,t)=>s+t.pct,0)/losses.length : 0;
+      const totalReturnPct = ((finalEquity - START_CASH)/START_CASH)*100;
+      const coinMeta = state.coins.find(c=>c.id===coinId);
+      const coinLabel = coinMeta ? `${coinMeta.name} (${(coinMeta.symbol||"").toUpperCase()})` : coinId;
+
+      renderBacktestResults({
+        coinLabel, days, totalTrades: closedTrades.length, winRate, avgWinPct, avgLossPct,
+        totalReturnPct, finalEquity, maxDrawdownPct, equityCurve, trades: closedTrades,
+        stillOpen: !!position
+      });
+    }catch(e){
+      btResultsEl.innerHTML = `<div class="bt-error">Couldn't run the backtest (${esc(e.message||"unknown error")}). CoinGecko's free API can be rate-limited — wait a moment and try again.</div>`;
+    }finally{
+      btRunBtn.disabled = false;
+      btRunBtn.textContent = "Run backtest";
+    }
+  }
+
+  function renderBacktestResults(r){
+    const positive = r.totalReturnPct >= 0;
+    btResultsEl.innerHTML = `
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-label">Coin tested</div><div class="summary-value" style="font-size:13px;">${esc(r.coinLabel)}</div></div>
+        <div class="summary-card"><div class="summary-label">Closed trades</div><div class="summary-value">${r.totalTrades}</div></div>
+        <div class="summary-card"><div class="summary-label">Win rate</div><div class="summary-value" style="color:${r.winRate>=50?'var(--up)':'var(--down)'}">${r.winRate.toFixed(1)}%</div></div>
+        <div class="summary-card"><div class="summary-label">Avg win / avg loss</div><div class="summary-value" style="font-size:13px;"><span style="color:var(--up)">+${r.avgWinPct.toFixed(2)}%</span> / <span style="color:var(--down)">${r.avgLossPct.toFixed(2)}%</span></div></div>
+        <div class="summary-card"><div class="summary-label">Total return</div><div class="summary-value" style="color:${positive?'var(--up)':'var(--down)'}">${fmtSigned(r.totalReturnPct)}%</div></div>
+        <div class="summary-card"><div class="summary-label">Max drawdown</div><div class="summary-value" style="color:var(--down)">-${r.maxDrawdownPct.toFixed(1)}%</div></div>
+      </div>
+      ${r.stillOpen ? `<div class="bt-status">Note: a position was still open at the end of this period — it isn't counted as a win or loss above.</div>` : ""}
+      <div style="margin:12px 0 18px;">${detailChartSVG(r.equityCurve, positive)}</div>
+      ${r.trades.length===0 ? `<div class="empty-inline">No trades were triggered in this period — the signal never fired, so there's nothing to evaluate yet. Try a longer lookback or a more volatile coin.</div>` : `
+      <div class="log-wrap"><table class="log-table">
+        <thead><tr><th>Entry</th><th>Exit</th><th>Entry $</th><th>Exit $</th><th>Result</th><th>P/L</th></tr></thead>
+        <tbody>${r.trades.map(t=>`
+          <tr>
+            <td style="color:var(--muted)">${new Date(t.entryTime).toLocaleDateString()}</td>
+            <td style="color:var(--muted)">${new Date(t.exitTime).toLocaleDateString()}</td>
+            <td class="num">$${fmtPrice(t.entryPrice)}</td>
+            <td class="num">$${fmtPrice(t.exitPrice)}</td>
+            <td>${esc(t.reason)}</td>
+            <td class="num" style="color:${t.pnl>=0?'var(--up)':'var(--down)'}">${fmtSigned(t.pnl)} (${fmtSigned(t.pct)}%)</td>
+          </tr>`).join("")}</tbody>
+      </table></div>`}
+      <p class="section-note" style="margin-top:14px;">This reflects what the current settings would have done on ${esc(r.coinLabel)}'s real price history — it isn't a guarantee for what happens next. Try a few different coins and periods before trusting any single result.</p>
+    `;
+  }
+
+  btRunBtn.addEventListener("click", runBacktest);
+
+  function updateNotifyBtn(){
+    if(typeof Notification === "undefined"){
+      notifyBtn.textContent = "🔕 Alerts not supported in this browser";
+      notifyBtn.disabled = true;
+      return;
+    }
+    if(Notification.permission === "granted"){
+      notifyBtn.textContent = "🔔 Alerts enabled";
+      notifyBtn.classList.add("enabled");
+    } else {
+      notifyBtn.textContent = "🔔 Enable alerts for buy/sell signals";
+      notifyBtn.classList.remove("enabled");
+    }
+  }
+  notifyBtn.addEventListener("click", async ()=>{
+    if(typeof Notification === "undefined") return;
+    if(Notification.permission === "default"){
+      await Notification.requestPermission();
+    }
+    updateNotifyBtn();
+  });
+
+  // ---------- init ----------
+  loadPersisted();
+  renderBotUI();
+  renderSignals();
+  updateNotifyBtn();
+  fetchData();
+  setInterval(fetchData, 45000);
+})();
+</script>
+</body>
+</html>
